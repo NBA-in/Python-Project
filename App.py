@@ -1,103 +1,204 @@
-import customtkinter as ctk
-from tkinter import messagebox
+import pygame
+import sys
 
-ctk.set_appearance_mode("System")  
-ctk.set_default_color_theme("blue") 
+pygame.init()
+WIDTH, HEIGHT = 350, 570
+screen = pygame.display.set_mode((WIDTH, HEIGHT))
+pygame.display.set_caption("Modern Marks Calculator")
 
-def calculate_results():
+# Colors
+BG_COLOR = (36, 36, 36)
+TEXT_COLOR = (240, 240, 240)
+GRAY = (150, 150, 150)
+INPUT_BG_ACTIVE = (50, 50, 50)
+INPUT_BG_INACTIVE = (40, 40, 40)
+BUTTON_COLOR = (31, 106, 165)
+BUTTON_HOVER = (20, 72, 112)
+WARN_COLOR = (231, 76, 60)
+
+font_title = pygame.font.SysFont("segoeui", 32, bold=True)
+font_label = pygame.font.SysFont("segoeui", 16)
+font_input = pygame.font.SysFont("segoeui", 18)
+font_info = pygame.font.SysFont("segoeui", 14, italic=True)
+font_bold = pygame.font.SysFont("segoeui", 16, bold=True)
+
+font_result_lbl = pygame.font.SysFont("segoeui", 20, bold=True)
+font_result_val = pygame.font.SysFont("segoeui", 22, bold=True)
+font_grade = pygame.font.SysFont("segoeui", 36, bold=True)
+
+GRADE_COLORS = {
+    "A": (46, 204, 113),  # #2ecc71
+    "B": (52, 152, 219),  # #3498db
+    "C": (241, 196, 15),  # #f1c40f
+    "D": (230, 126, 34),  # #e67e22
+    "F": (231, 76, 60)    # #e74c3c
+}
+
+# State
+math_text = ""
+science_text = ""
+english_text = ""
+active_input = None  # 0: math, 1: science, 2: english
+
+error_message = ""
+total_result = "0.0 / 300"
+percentage_result = "0.00%"
+grade_result = "-"
+grade_color = TEXT_COLOR
+
+def calculate():
+    global error_message, total_result, percentage_result, grade_result, grade_color
     try:
-        # Fetching Inputs
-        math_score = float(entry_math.get())
-        science_score = float(entry_science.get())
-        english_score = float(entry_english.get())
-
-        # --- NEW: Validation Logic ---
-        # Check if any score is out of the 0-100 bounds
-        if any(score < 0 or score > 100 for score in [math_score, science_score, english_score]):
-            messagebox.showwarning("Invalid Input", "Marks must be between 0 and 100 for each subject.")
-            return # Stops the calculation here if the input is invalid
-
-        # Mathematical Logic
-        total = math_score + science_score + english_score
-        max_marks = 300
-        percentage = (total / max_marks) * 100
-
-        # Grading and Color Logic
-        if percentage >= 90:
+        error_message = ""
+        m = float(math_text)
+        s = float(science_text)
+        e = float(english_text)
+        
+        if any(x < 0 or x > 100 for x in [m, s, e]):
+            error_message = "Marks must be between 0 and 100."
+            return
+            
+        total = m + s + e
+        perc = (total / 300.0) * 100.0
+        
+        if perc >= 90:
             grade = "A"
-            color = "#2ecc71" 
-        elif percentage >= 80:
+        elif perc >= 80:
             grade = "B"
-            color = "#3498db" 
-        elif percentage >= 70:
+        elif perc >= 70:
             grade = "C"
-            color = "#f1c40f" 
-        elif percentage >= 60:
+        elif perc >= 60:
             grade = "D"
-            color = "#e67e22" 
         else:
             grade = "F"
-            color = "#e74c3c" 
-
-        # Updating the UI 
-        label_total_result.configure(text=f"{total:.1f} / {max_marks}")
-        label_percentage_result.configure(text=f"{percentage:.2f}%")
-        label_grade_result.configure(text=grade, text_color=color)
-
+            
+        total_result = f"{total:.1f} / 300"
+        percentage_result = f"{perc:.2f}%"
+        grade_result = grade
+        grade_color = GRADE_COLORS[grade]
+        
     except ValueError:
-        messagebox.showerror("Input Error", "Please enter valid numbers for all subjects.")
+        error_message = "Please enter valid numbers."
 
-# --- Modern GUI Setup ---
-root = ctk.CTk()
-root.title("Modern Marks Calculator")
-root.geometry("350x570") # Made the window slightly taller to fit the new text
+# Main loop
+clock = pygame.time.Clock()
 
-# App Title
-title_label = ctk.CTkLabel(root, text="Marks Calculator", font=ctk.CTkFont(size=24, weight="bold"))
-title_label.pack(pady=(20, 5))
+input_rects = [
+    pygame.Rect(50, 140, 250, 35),
+    pygame.Rect(50, 220, 250, 35),
+    pygame.Rect(50, 300, 250, 35)
+]
+button_rect = pygame.Rect(75, 370, 200, 40)
 
-# --- NEW: Helpful Info Label ---
-info_label = ctk.CTkLabel(root, text="(Enter marks out of 100 for each subject)", font=ctk.CTkFont(size=12, slant="italic"), text_color="gray")
-info_label.pack(pady=(0, 10))
+running = True
+while running:
+    mouse_pos = pygame.mouse.get_pos()
+    
+    for event in pygame.event.get():
+        if event.type == pygame.QUIT:
+            running = False
+        if event.type == pygame.MOUSEBUTTONDOWN:
+            if event.button == 1:
+                active_input = None
+                for i, rect in enumerate(input_rects):
+                    if rect.collidepoint(mouse_pos):
+                        active_input = i
+                
+                if button_rect.collidepoint(mouse_pos):
+                    calculate()
+                    
+        if event.type == pygame.KEYDOWN:
+            if event.key == pygame.K_RETURN:
+                calculate()
+            elif event.key == pygame.K_TAB:
+                if active_input is not None:
+                    active_input = (active_input + 1) % 3
+                else:
+                    active_input = 0
+            elif active_input is not None:
+                if event.key == pygame.K_BACKSPACE:
+                    if active_input == 0:
+                        math_text = math_text[:-1]
+                    elif active_input == 1:
+                        science_text = science_text[:-1]
+                    elif active_input == 2:
+                        english_text = english_text[:-1]
+                else:
+                    char = event.unicode
+                    if char.isdigit() or char == '.':
+                        if active_input == 0:
+                            math_text += char
+                        elif active_input == 1:
+                            science_text += char
+                        elif active_input == 2:
+                            english_text += char
+                            
+    screen.fill(BG_COLOR)
+    
+    # Draw Title
+    title_surface = font_title.render("Marks Calculator", True, TEXT_COLOR)
+    screen.blit(title_surface, (WIDTH//2 - title_surface.get_width()//2, 20))
+    
+    info_surface = font_info.render("(Enter marks out of 100 for each subject)", True, GRAY)
+    screen.blit(info_surface, (WIDTH//2 - info_surface.get_width()//2, 55))
+    
+    # Draw Inputs
+    labels = ["Math Marks:", "Science Marks:", "English Marks:"]
+    texts = [math_text, science_text, english_text]
+    
+    for i in range(3):
+        label_surf = font_label.render(labels[i], True, TEXT_COLOR)
+        screen.blit(label_surf, (input_rects[i].x, input_rects[i].y - 25))
+        
+        color = INPUT_BG_ACTIVE if active_input == i else INPUT_BG_INACTIVE
+        pygame.draw.rect(screen, color, input_rects[i], border_radius=5)
+        
+        # Border
+        border_color = BUTTON_COLOR if active_input == i else GRAY
+        pygame.draw.rect(screen, border_color, input_rects[i], 2, border_radius=5)
+        
+        # Text
+        txt_surf = font_input.render(texts[i], True, TEXT_COLOR)
+        if not texts[i] and active_input != i:
+            ph_surf = font_input.render("max 100", True, GRAY)
+            screen.blit(ph_surf, (input_rects[i].x + input_rects[i].width//2 - ph_surf.get_width()//2, input_rects[i].y + 7))
+        else:
+            screen.blit(txt_surf, (input_rects[i].x + input_rects[i].width//2 - txt_surf.get_width()//2, input_rects[i].y + 7))
+        
+    # Draw Button
+    btn_color = BUTTON_HOVER if button_rect.collidepoint(mouse_pos) else BUTTON_COLOR
+    pygame.draw.rect(screen, btn_color, button_rect, border_radius=8)
+    btn_txt = font_bold.render("Calculate Results", True, TEXT_COLOR)
+    screen.blit(btn_txt, (button_rect.x + button_rect.width//2 - btn_txt.get_width()//2, button_rect.y + 10))
+    
+    # Draw Error Message
+    if error_message:
+        err_surf = font_label.render(error_message, True, WARN_COLOR)
+        screen.blit(err_surf, (WIDTH//2 - err_surf.get_width()//2, 420))
+        
+    # Draw Results
+    res_y = 440
+    
+    # Total
+    tot_lbl = font_result_lbl.render("Total:", True, TEXT_COLOR)
+    tot_val = font_result_val.render(total_result, True, TEXT_COLOR)
+    screen.blit(tot_lbl, (50, res_y))
+    screen.blit(tot_val, (190, res_y - 2))
+    
+    # Percentage
+    perc_lbl = font_result_lbl.render("Percentage:", True, TEXT_COLOR)
+    perc_val = font_result_val.render(percentage_result, True, TEXT_COLOR)
+    screen.blit(perc_lbl, (50, res_y + 40))
+    screen.blit(perc_val, (190, res_y + 38))
+    
+    # Grade
+    grd_lbl = font_result_lbl.render("Grade:", True, TEXT_COLOR)
+    grd_val = font_grade.render(grade_result, True, grade_color)
+    screen.blit(grd_lbl, (50, res_y + 80))
+    screen.blit(grd_val, (190, res_y + 70))
+    
+    pygame.display.flip()
+    clock.tick(60)
 
-# --- Input Frame ---
-input_frame = ctk.CTkFrame(root)
-input_frame.pack(pady=10, padx=30, fill="both", expand=True)
-
-# Math Input (Updated placeholders for extra clarity)
-ctk.CTkLabel(input_frame, text="Math Marks:", font=ctk.CTkFont(size=14)).pack(pady=(15, 0))
-entry_math = ctk.CTkEntry(input_frame, placeholder_text="max 100", justify="center")
-entry_math.pack(pady=(5, 10))
-
-# Science Input
-ctk.CTkLabel(input_frame, text="Science Marks:", font=ctk.CTkFont(size=14)).pack(pady=(0, 0))
-entry_science = ctk.CTkEntry(input_frame, placeholder_text="max 100", justify="center")
-entry_science.pack(pady=(5, 10))
-
-# English Input
-ctk.CTkLabel(input_frame, text="English Marks:", font=ctk.CTkFont(size=14)).pack(pady=(0, 0))
-entry_english = ctk.CTkEntry(input_frame, placeholder_text="max 100", justify="center")
-entry_english.pack(pady=(5, 15))
-
-# --- Calculate Button ---
-calc_button = ctk.CTkButton(root, text="Calculate Results", command=calculate_results, font=ctk.CTkFont(size=14, weight="bold"), height=40)
-calc_button.pack(pady=10)
-
-# --- Results Frame ---
-result_frame = ctk.CTkFrame(root, fg_color="transparent") 
-result_frame.pack(pady=10)
-
-ctk.CTkLabel(result_frame, text="Total:", font=ctk.CTkFont(size=14, weight="bold")).grid(row=0, column=0, padx=10, pady=5, sticky="e")
-label_total_result = ctk.CTkLabel(result_frame, text="0 / 300", font=ctk.CTkFont(size=14))
-label_total_result.grid(row=0, column=1, padx=10, pady=5, sticky="w")
-
-ctk.CTkLabel(result_frame, text="Percentage:", font=ctk.CTkFont(size=14, weight="bold")).grid(row=1, column=0, padx=10, pady=5, sticky="e")
-label_percentage_result = ctk.CTkLabel(result_frame, text="0.00%", font=ctk.CTkFont(size=14))
-label_percentage_result.grid(row=1, column=1, padx=10, pady=5, sticky="w")
-
-ctk.CTkLabel(result_frame, text="Grade:", font=ctk.CTkFont(size=16, weight="bold")).grid(row=2, column=0, padx=10, pady=10, sticky="e")
-label_grade_result = ctk.CTkLabel(result_frame, text="-", font=ctk.CTkFont(size=24, weight="bold"))
-label_grade_result.grid(row=2, column=1, padx=10, pady=10, sticky="w")
-
-# Run the application
-root.mainloop()
+pygame.quit()
+sys.exit()
